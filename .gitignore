@@ -1,0 +1,22 @@
+# Node / build artifacts
+node_modules/
+lib/
+*.tsbuildinfo
+*.tsbuildinfo.*
+dist/
+coverage/
+.pnpm-store/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+*.swp
+
+# Local secrets — never commit real keys
+.env
+.env.local
+*.pem
+.credentials.yaml
