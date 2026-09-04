@@ -5,23 +5,7 @@
 - 宿主端：`getBalance` 通过凭据服务读取 `DEEPSEEK_API_KEY`，经 curl 调用 DeepSeek 余额接口（Key 只放在环境变量里，绝不进入命令行）；`getSessionUsage` 回放会话日志，按模型归集 Provider 上报的 token 用量，并按价目表估算费用。
 - 前端端：徽标注册进 `conversation.session.header.utilities` 插槽（追加式，不替换任何现有 UI），token 数读取持久的 `tokenUsage` 会话投影。
 
-```
-┌──────────────────────────────────────┐
-│ 会话头部: [● CNY 110.00]   ← 徽标    │
-│                                      │
-│ 点击展开面板:                         │
-│   API 概览                    [可用]  │
-│   账户余额                            │
-│   CNY                                 │
-│   剩余金额    110.00                  │
-│   ─────────────────────────────       │
-│   本会话用量                          │
-│   Tokens · 输入 4.6M · 输出 64.7K  缓存 98% │
-│   估算费用     ¥0.653                 │
-│   按官方实时价目估算（峰谷分时），实际以账单为准 │
-│   更新于 21:05:12            [刷新]   │
-└──────────────────────────────────────┘
-```
+![display_demo](./docs/display_demo.png)
 
 ## 特性
 
@@ -52,6 +36,8 @@ dsh-api-balance/
 ### 方式 A：一键安装为持久化插件（推荐，重启不丢失）
 
 前提：本机有 **deepseek-harness 的 git 检出**（能跑 `pnpm install` / `pnpm run build` 的环境），并已配置 `DEEPSEEK_API_KEY`。
+
+> 兼容性：本插件在 dsh 0.1.1-rc.2 下开发并测试（dsh --version 可查看你的版本）。建议使用相同版本；其他版本如遇问题欢迎反馈。
 
 ```bash
 # 1. 下载本项目并进入目录

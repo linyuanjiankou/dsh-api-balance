@@ -5,6 +5,8 @@ A persistent **API balance badge** for the [DeepSeek Harness](https://github.com
 - Host side: `getBalance` resolves `DEEPSEEK_API_KEY` through the credential seam and calls the DeepSeek balance endpoint via curl (the key rides an explicit env entry, never the command line); `getSessionUsage` replays the durable session log and folds provider-reported usage per model, priced under the live official rate card.
 - Client side: the badge registers into the `conversation.session.header.utilities` slot (additive; nothing is replaced), and token counts come from the durable `tokenUsage` session projection.
 
+![display_demo](./docs/display_demo.png)
+
 ## Features
 
 - Persistent session-header balance badge (multi-currency) with a status dot (green = available / yellow = unavailable / red = error)
@@ -34,6 +36,9 @@ dsh-api-balance/
 ### Option A: one-shot persistent install (recommended, survives restarts)
 
 Prerequisites: a **git checkout of deepseek-harness** with a working `pnpm install` / `pnpm run build`, and a configured `DEEPSEEK_API_KEY`.
+
+> Compatibility: This plugin was developed and tested under dsh 0.1.1-rc.2 (you can check your version with dsh --version). It is recommended to use the same version; if you encounter any issues with other versions, feedback is welcome.
+
 
 ```bash
 git clone <your-repo-url> && cd dsh-api-balance
