@@ -34,11 +34,19 @@ rate card, in CNY per 1M tokens, with Beijing peak windows (09:00-12:00,
 The rate card is **resolved at runtime**: the gateway fetches the official
 pricing page (`https://api-docs.deepseek.com/zh-cn/quick_start/pricing/`)
 through the `web` provider and parses the price table, caching it for 6 hours.
-When the page is unreachable or the table structure changes, it falls back to
-the baked `FALLBACK_RATES` table, so price changes published on the official
-page apply automatically without a code update. The result reports
-`ratesSource: 'live' | 'fallback'` so the UI can say which card priced the
-session.
+
+- **Model names come from the page**, not from code, so a newly published model
+  generation is priced as soon as the page lists it. Each header cell drops its
+  `<sup>` footnote marker (`deepseek-flash<sup>(1)</sup>` is the model id
+  `deepseek-flash`), and a trailing `(1)`-style reference is stripped too.
+- The live card is **overlaid on** the baked `FALLBACK_RATES` table rather than
+  replacing it: the page lists only the models it currently markets, while the
+  fallback still carries superseded ids that older session logs recorded.
+- When the page is unreachable or unparsable the baked table alone prices the
+  session.
+
+The result reports `ratesSource: 'live' | 'fallback'` so the UI can say which
+card priced the session.
 
 Cache-write tokens are billed at the input-miss rate. Models without a rate-card
 entry report tokens with `priced: false` and zero cost.
@@ -47,7 +55,11 @@ entry report tokens with `priced: false` and zero cost.
 
 - The peak/off-peak **schedule** (09:00-12:00 and 14:00-18:00 Beijing) is baked
   into `isBeijingPeak`; the official page does not state the hours, so a
-  schedule change still needs a code update. The prices themselves auto-update.
+  schedule change still needs a code update. The prices and model list
+  auto-update.
+- Session-side lookup is an exact model-id match. The page's current ids work
+  live; a superseded id prices only while it stays in `FALLBACK_RATES`, and
+  removing it from that table makes historical sessions report `priced: false`.
 - The live price parser targets the current Docusaurus table structure
   (Chinese labels 缓存命中 / 缓存未命中 / 输出 with 空闲时段 / 高峰时段 rows);
   a restructured page falls back to the baked table.

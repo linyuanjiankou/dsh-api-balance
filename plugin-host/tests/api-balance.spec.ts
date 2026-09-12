@@ -15,15 +15,15 @@ afterEach(async () => {
 /** Minimal official-page HTML mirroring the Docusaurus price table structure. */
 const PRICING_HTML = `
 <html><body><table>
-<tr><th>模型</th><th>deepseek-v4-flash</th><th>deepseek-v4-pro</th></tr>
+<tr><td colspan="3">模型</td><td>deepseek-flash<sup>(1)</sup></td><td>deepseek-v4-pro<sup>(2)</sup></td></tr>
 <tr></tr>
 <tr><td>BASE URL</td><td>https://api.deepseek.com</td></tr>
-<tr><td>价格(1)(2)</td><td>百万tokens输入（缓存命中）</td><td>空闲时段</td><td>0.05元</td><td>0.15元</td></tr>
-<tr><td>高峰时段</td><td>0.10元</td><td>0.30元</td></tr>
-<tr><td>百万tokens输入（缓存未命中）</td><td>空闲时段</td><td>1.5元</td><td>4.5元</td></tr>
-<tr><td>高峰时段</td><td>3.0元</td><td>9.0元</td></tr>
-<tr><td>百万tokens输出</td><td>空闲时段</td><td>4.5元</td><td>13.5元</td></tr>
-<tr><td>高峰时段</td><td>9.0元</td><td>27.0元</td></tr>
+<tr><td>价格(3)</td><td>百万tokens输入（缓存命中）</td><td>空闲时段</td><td>0.02元</td><td>0.15元</td></tr>
+<tr><td>高峰时段</td><td>0.04元</td><td>0.30元</td></tr>
+<tr><td>百万tokens输入（缓存未命中）</td><td>空闲时段</td><td>1元</td><td>4.5元</td></tr>
+<tr><td>高峰时段</td><td>2元</td><td>9.0元</td></tr>
+<tr><td>百万tokens输出</td><td>空闲时段</td><td>4元</td><td>13.5元</td></tr>
+<tr><td>高峰时段</td><td>8元</td><td>27.0元</td></tr>
 </table></body></html>
 `
 
@@ -341,7 +341,7 @@ describe('ApiBalanceGateway', () => {
           {
             model: 'deepseek-v4-flash',
             tokens: { uncached: 1000, out: 2000, cacheRead: 4000, cacheWrite: 0 },
-            cost: (1000 * 1.5 + 4000 * 0.05 + 2000 * 4.5) / 1e6,
+            cost: (1000 * 1 + 4000 * 0.02 + 2000 * 4) / 1e6,
             priced: true,
           },
         ])
@@ -366,7 +366,7 @@ describe('ApiBalanceGateway', () => {
       })
       const result = await gateway.getSessionUsage('s1')
       expect(result.status).toBe('ok')
-      if (result.status === 'ok') expect(result.data.totalCost).toBeCloseTo(5 * 1000 * 1.5 / 1e6, 10)
+      if (result.status === 'ok') expect(result.data.totalCost).toBeCloseTo(5 * 1000 * 1 / 1e6, 10)
     })
 
     it('replaces the usage-chunk sample with the step message sample', async () => {
@@ -436,7 +436,7 @@ describe('ApiBalanceGateway', () => {
       })
       const result = await gateway.getSessionUsage('s1')
       expect(result.status).toBe('ok')
-      if (result.status === 'ok') expect(result.data.totalCost).toBeCloseTo(1000 * 1.5 / 1e6, 10)
+      if (result.status === 'ok') expect(result.data.totalCost).toBeCloseTo(1000 * 1 / 1e6, 10)
     })
 
     it('prices the vision-exp model from the fallback table', async () => {
@@ -448,7 +448,7 @@ describe('ApiBalanceGateway', () => {
       })
       const result = await gateway.getSessionUsage('s1')
       expect(result.status).toBe('ok')
-      if (result.status === 'ok') expect(result.data.totalCost).toBeCloseTo(1000 * 1.5 / 1e6, 10)
+      if (result.status === 'ok') expect(result.data.totalCost).toBeCloseTo(1000 * 1 / 1e6, 10)
     })
   })
 
@@ -465,15 +465,16 @@ describe('ApiBalanceGateway', () => {
         webFetch: htmlFetch(PRICING_HTML),
         readSession: async () => ({
           session: {},
-          events: [messageEvent({ usage: { inputTokens: 1000, outputTokens: 2000, cacheReadTokens: 4000 } })],
+          events: [messageEvent({ model: 'deepseek-flash', usage: { inputTokens: 1000, outputTokens: 2000, cacheReadTokens: 4000 } })],
         }),
       })
       const result = await gateway.getSessionUsage('s1')
       expect(result.status).toBe('ok')
       if (result.status === 'ok') {
-        // flash off-peak live values equal the fallback, so the cost matches.
+        // The page's `<sup>(1)</sup>` marker must not leak into the model key.
         expect(result.data.ratesSource).toBe('live')
-        expect(result.data.models[0]!.cost).toBeCloseTo((1000 * 1.5 + 4000 * 0.05 + 2000 * 4.5) / 1e6, 10)
+        expect(result.data.models[0]!.model).toBe('deepseek-flash')
+        expect(result.data.models[0]!.cost).toBeCloseTo((1000 * 1 + 4000 * 0.02 + 2000 * 4) / 1e6, 10)
       }
       expect(web).toHaveBeenCalledWith({ url: 'https://api-docs.deepseek.com/zh-cn/quick_start/pricing/' })
     })
@@ -484,12 +485,41 @@ describe('ApiBalanceGateway', () => {
         webFetch: htmlFetch(PRICING_HTML),
         readSession: async () => ({
           session: {},
-          events: [messageEvent({ time: peak, usage: { inputTokens: 1000, outputTokens: 0 } })],
+          events: [messageEvent({ model: 'deepseek-flash', time: peak, usage: { inputTokens: 1000, outputTokens: 0 } })],
         }),
       })
       const result = await gateway.getSessionUsage('s1')
       expect(result.status).toBe('ok')
-      if (result.status === 'ok') expect(result.data.totalCost).toBeCloseTo(1000 * 3.0 / 1e6, 10)
+      if (result.status === 'ok') expect(result.data.totalCost).toBeCloseTo(1000 * 2 / 1e6, 10)
+    })
+
+    it('overlays the live card on the baked one so superseded models stay priced', async () => {
+      // A generation change can leave the page listing only its current models;
+      // a session recorded under a superseded id must still price.
+      const flashOnly = `
+<html><body><table>
+<tr><td>模型</td><td>deepseek-flash</td></tr>
+<tr><td>百万tokens输入（缓存命中）</td><td>空闲时段</td><td>0.02元</td></tr>
+<tr><td>高峰时段</td><td>0.04元</td></tr>
+<tr><td>百万tokens输入（缓存未命中）</td><td>空闲时段</td><td>1元</td></tr>
+<tr><td>高峰时段</td><td>2元</td></tr>
+<tr><td>百万tokens输出</td><td>空闲时段</td><td>4元</td></tr>
+<tr><td>高峰时段</td><td>8元</td></tr>
+</table></body></html>`
+      const { gateway } = await harness({
+        webFetch: htmlFetch(flashOnly),
+        readSession: async () => ({
+          session: {},
+          events: [messageEvent({ model: 'deepseek-v4-pro', usage: { inputTokens: 1000, outputTokens: 0 } })],
+        }),
+      })
+      const result = await gateway.getSessionUsage('s1')
+      expect(result.status).toBe('ok')
+      if (result.status === 'ok') {
+        expect(result.data.ratesSource).toBe('live')
+        expect(result.data.models[0]!.priced).toBe(true)
+        expect(result.data.totalCost).toBeCloseTo(1000 * 4.5 / 1e6, 10)
+      }
     })
 
     it('falls back to the baked table on a non-200 response', async () => {
@@ -547,7 +577,7 @@ describe('ApiBalanceGateway', () => {
     })
 
     it('falls back when a price cell carries no number', async () => {
-      const broken = PRICING_HTML.replace('1.5元', '待定')
+      const broken = PRICING_HTML.replace('<td>1元</td>', '<td>待定</td>')
       const { gateway } = await harness({
         webFetch: htmlFetch(broken),
         readSession: async () => ({ session: {}, events: [messageEvent({ usage: { inputTokens: 1000, outputTokens: 0 } })] }),

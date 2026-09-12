@@ -56,25 +56,31 @@ interface ModelRates {
 
 /** Baked fallback rate card (CNY per 1M tokens), used when the live page is unavailable. */
 const FALLBACK_RATES: Readonly<Record<string, ModelRates>> = {
-  'deepseek-v4-flash': {
-    off: { inputMiss: 1.5, inputHit: 0.05, output: 4.5 },
-    peak: { inputMiss: 3.0, inputHit: 0.10, output: 9.0 },
+  'deepseek-flash': {
+    off: { inputMiss: 1, inputHit: 0.02, output: 4 },
+    peak: { inputMiss: 2, inputHit: 0.04, output: 8 },
   },
   'deepseek-v4-pro': {
     off: { inputMiss: 4.5, inputHit: 0.15, output: 13.5 },
     peak: { inputMiss: 9.0, inputHit: 0.30, output: 27.0 },
   },
+  // Superseded flash names: the pricing page still documents them as callable
+  // aliases of the current flash model, so they carry its rate.
+  'deepseek-v4-flash': {
+    off: { inputMiss: 1, inputHit: 0.02, output: 4 },
+    peak: { inputMiss: 2, inputHit: 0.04, output: 8 },
+  },
   'deepseek-v4-flash-vision-exp': {
-    off: { inputMiss: 1.5, inputHit: 0.05, output: 4.5 },
-    peak: { inputMiss: 3.0, inputHit: 0.10, output: 9.0 },
+    off: { inputMiss: 1, inputHit: 0.02, output: 4 },
+    peak: { inputMiss: 2, inputHit: 0.04, output: 8 },
   },
   'deepseek-chat': {
-    off: { inputMiss: 1.5, inputHit: 0.05, output: 4.5 },
-    peak: { inputMiss: 3.0, inputHit: 0.10, output: 9.0 },
+    off: { inputMiss: 1, inputHit: 0.02, output: 4 },
+    peak: { inputMiss: 2, inputHit: 0.04, output: 8 },
   },
   'deepseek-reasoner': {
-    off: { inputMiss: 1.5, inputHit: 0.05, output: 4.5 },
-    peak: { inputMiss: 3.0, inputHit: 0.10, output: 9.0 },
+    off: { inputMiss: 1, inputHit: 0.02, output: 4 },
+    peak: { inputMiss: 2, inputHit: 0.04, output: 8 },
   },
 }
 
@@ -102,13 +108,18 @@ function parsePrice(cell: string): number | null {
  * whose first cell names the bucket (输入缓存命中 / 输入缓存未命中 / 输出); the
  * 空闲时段/高峰时段 rows carry the per-model values, reusing the bucket named
  * by the row above. Returns null when the structure is missing or incomplete.
+ *
+ * Model names come from the page, so a newly published generation is picked up
+ * without a code change; each header cell drops its `<sup>` footnote marker
+ * (`deepseek-flash<sup>(1)</sup>` is the model id `deepseek-flash`).
  * @param htmlText - the pricing page body.
  * @returns model -> off/peak price levels, or null.
  */
 function parseRateTable(htmlText: string): Record<string, ModelRates> | null {
   const rows = [...htmlText.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)]
   const cellsOf = (row: string): string[] => (
-    [...row.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map(match => stripTags(match[1] ?? '').trim())
+    [...row.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)]
+      .map(match => stripTags((match[1] ?? '').replace(/<sup[\s\S]*?<\/sup>/g, '')).trim())
   )
   const table: Record<string, ModelRates> = {}
   let models: string[] = []
@@ -118,7 +129,9 @@ function parseRateTable(htmlText: string): Record<string, ModelRates> | null {
     if (cells.length === 0) continue
     const firstCell = cells[0] ?? ''
     if (firstCell === '模型' && cells.length > 1) {
-      models = cells.slice(1)
+      // A trailing footnote reference that survived as text (`deepseek-flash(1)`)
+      // is not part of the model id.
+      models = cells.slice(1).map(name => name.replace(/[(（]\d+[)）]\s*$/, '').trim())
       for (const model of models) {
         table[model] = { off: { inputMiss: 0, inputHit: 0, output: 0 }, peak: { inputMiss: 0, inputHit: 0, output: 0 } }
       }
@@ -318,7 +331,10 @@ export class ApiBalanceGateway extends TypertRemoteService {
         if (result.statusCode === 200 && result.body.kind === 'html') {
           const parsed = parseRateTable(result.body.content)
           if (parsed !== null) {
-            table = parsed
+            // Overlay the live card on the baked one: the page lists only the
+            // models it currently markets, while the fallback still carries the
+            // superseded names older sessions recorded. Live entries win.
+            table = { ...FALLBACK_RATES, ...parsed }
             live = true
           }
         }

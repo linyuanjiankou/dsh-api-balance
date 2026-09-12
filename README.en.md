@@ -5,8 +5,6 @@ A persistent **API balance badge** for the [DeepSeek Harness](https://github.com
 - Host side: `getBalance` resolves `DEEPSEEK_API_KEY` through the credential seam and calls the DeepSeek balance endpoint via curl (the key rides an explicit env entry, never the command line); `getSessionUsage` replays the durable session log and folds provider-reported usage per model, priced under the live official rate card.
 - Client side: the badge registers into the `conversation.session.header.utilities` slot (additive; nothing is replaced), and token counts come from the durable `tokenUsage` session projection.
 
-![display_demo](./docs/display_demo.png)
-
 ## Features
 
 - Persistent session-header balance badge (multi-currency) with a status dot (green = available / yellow = unavailable / red = error)
@@ -37,9 +35,6 @@ dsh-api-balance/
 
 Prerequisites: a **git checkout of deepseek-harness** with a working `pnpm install` / `pnpm run build`, and a configured `DEEPSEEK_API_KEY`.
 
-> Compatibility: This plugin was developed and tested under dsh 0.1.1-rc.2 (you can check your version with dsh --version). It is recommended to use the same version; if you encounter any issues with other versions, feedback is welcome.
-
-
 ```bash
 git clone <your-repo-url> && cd dsh-api-balance
 bash scripts/install.sh /path/to/deepseek-harness   # idempotent
@@ -61,7 +56,9 @@ The plugin resolves `DEEPSEEK_API_KEY` through the Harness credential seam (proc
 
 ## Cost estimation and auto-updating prices
 
-- **No manual sync**: `getSessionUsage` fetches the official pricing page (`https://api-docs.deepseek.com/zh-cn/quick_start/pricing/`) and parses the price table, caching it for 6 hours, so official price changes apply automatically within 6 hours. When the page is unreachable or restructured it falls back to the baked `FALLBACK_RATES` table in `plugin-host/src/index.ts`; the panel notes which card priced the session.
+- **No manual sync**: `getSessionUsage` fetches the official pricing page (`https://api-docs.deepseek.com/zh-cn/quick_start/pricing/`) and parses the price table, caching it for 6 hours, so official price changes apply automatically within 6 hours.
+- **Model names also come from the page**, so a newly published generation (e.g. `deepseek-flash`) is priced as soon as the page lists it. Header footnote markers (`deepseek-flash<sup>(1)</sup>`) are stripped so the key matches the model id the Harness actually calls.
+- The live card is **overlaid on** the baked `FALLBACK_RATES` table: the page lists only currently marketed models, while the fallback keeps superseded ids that older sessions recorded. When the page is unreachable only the baked table is used, and the panel says which card priced the session.
 - Peak hours: 09:00-12:00 and 14:00-18:00 Beijing time use the peak tier from the page, the rest the off-peak tier. The schedule itself lives in `isBeijingPeak` (the official page does not publish the hours).
 - Cache-write tokens bill at the input-miss rate.
 - The amount is an **estimate for display**; the DeepSeek invoice is authoritative.

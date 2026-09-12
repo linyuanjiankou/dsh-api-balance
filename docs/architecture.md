@@ -41,10 +41,18 @@
 1. 通过 `web` 服务抓取官方价格页
    `https://api-docs.deepseek.com/zh-cn/quick_start/pricing/`（Docusaurus
    服务端渲染，价格表格在 HTML 中）；
-2. 用 `parseRateTable` 解析表格：表头行（`模型`）给出模型名，价格行按
-   「缓存命中 / 缓存未命中 / 输出」×「空闲时段 / 高峰时段」填入每档单价；
+2. 用 `parseRateTable` 解析表格：表头行（`模型`）给出**模型名（来自页面，不写死）**，
+   价格行按「缓存命中 / 缓存未命中 / 输出」×「空闲时段 / 高峰时段」填入每档单价；
+   表头单元格里的脚注标记（`deepseek-flash<sup>(1)</sup>`）会被剥离，否则模型键会变成
+   `deepseek-flash(1)` 而与 Harness 实际调用的模型 id 失配；
 3. 结果缓存 **6 小时**（`RATES_TTL`），避免每次打开面板都抓页面；
-4. 页面不可达、结构变化或解析失败时回退内置 `FALLBACK_RATES` 表。
+4. **叠加而非替换**：`{ ...FALLBACK_RATES, ...parsed }`——官方页只列当前在售模型，
+   内置表保留已被取代的旧名（如 `deepseek-v4-flash`、`deepseek-v4-flash-vision-exp`、
+   `deepseek-chat`），使历史会话与新模型都能计价；
+5. 页面不可达、结构变化或解析失败时仅用内置 `FALLBACK_RATES` 表。
+
+会话侧匹配是**精确字符串查表**：日志里记录的模型 id 必须与价目表的键完全一致。
+因此换代时只要官方页面更新（含模型名与价格），插件就会自动跟随。
 
 结果通过 `ratesSource: 'live' | 'fallback'` 告诉前端这次用的是实时价目还是
 内置回退价目，面板据此显示「按官方实时价目估算」或「按内置价目估算（官方价目

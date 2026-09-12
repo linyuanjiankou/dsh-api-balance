@@ -68,11 +68,13 @@ return {
 
     // 内置回退价目（元/百万 tokens；官方页面不可达时使用）
     const FALLBACK_RATES = {
-      'deepseek-v4-flash': { off: { inputMiss: 1.5, inputHit: 0.05, output: 4.5 }, peak: { inputMiss: 3.0, inputHit: 0.10, output: 9.0 } },
+      'deepseek-flash': { off: { inputMiss: 1, inputHit: 0.02, output: 4 }, peak: { inputMiss: 2, inputHit: 0.04, output: 8 } },
       'deepseek-v4-pro': { off: { inputMiss: 4.5, inputHit: 0.15, output: 13.5 }, peak: { inputMiss: 9.0, inputHit: 0.30, output: 27.0 } },
-      'deepseek-v4-flash-vision-exp': { off: { inputMiss: 1.5, inputHit: 0.05, output: 4.5 }, peak: { inputMiss: 3.0, inputHit: 0.10, output: 9.0 } },
-      'deepseek-chat': { off: { inputMiss: 1.5, inputHit: 0.05, output: 4.5 }, peak: { inputMiss: 3.0, inputHit: 0.10, output: 9.0 } },
-      'deepseek-reasoner': { off: { inputMiss: 1.5, inputHit: 0.05, output: 4.5 }, peak: { inputMiss: 3.0, inputHit: 0.10, output: 9.0 } },
+      // 已被取代的 flash 旧名：官方页仍注明可调用，按当前 flash 价计
+      'deepseek-v4-flash': { off: { inputMiss: 1, inputHit: 0.02, output: 4 }, peak: { inputMiss: 2, inputHit: 0.04, output: 8 } },
+      'deepseek-v4-flash-vision-exp': { off: { inputMiss: 1, inputHit: 0.02, output: 4 }, peak: { inputMiss: 2, inputHit: 0.04, output: 8 } },
+      'deepseek-chat': { off: { inputMiss: 1, inputHit: 0.02, output: 4 }, peak: { inputMiss: 2, inputHit: 0.04, output: 8 } },
+      'deepseek-reasoner': { off: { inputMiss: 1, inputHit: 0.02, output: 4 }, peak: { inputMiss: 2, inputHit: 0.04, output: 8 } },
     }
 
     // 北京高峰时段 09:00-12:00、14:00-18:00（无夏令时，固定 +8）
@@ -86,7 +88,7 @@ return {
     const parseRateTable = (htmlText) => {
       const rows = [...htmlText.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)]
       const cellsOf = (row) => [...row.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)]
-        .map((m) => (m[1] || '').replace(/<[^>]+>/g, '').trim())
+        .map((m) => (m[1] || '').replace(/<sup[\s\S]*?<\/sup>/g, '').replace(/<[^>]+>/g, '').trim())
       const table = {}
       let models = []
       let bucket = null
@@ -95,7 +97,8 @@ return {
         if (cells.length === 0) continue
         const first = cells[0] || ''
         if (first === '模型' && cells.length > 1) {
-          models = cells.slice(1)
+          // 表头单元格可能带脚注（deepseek-flash(1)），去掉后才是真实模型 id
+          models = cells.slice(1).map((n) => n.replace(/[(（]\d+[)）]\s*$/, '').trim())
           for (const model of models) {
             table[model] = { off: { inputMiss: 0, inputHit: 0, output: 0 }, peak: { inputMiss: 0, inputHit: 0, output: 0 } }
           }
@@ -142,7 +145,8 @@ return {
           if (result.statusCode === 200 && result.body && result.body.kind === 'html') {
             const parsed = parseRateTable(result.body.content)
             if (parsed !== null) {
-              table = parsed
+              // 叠加在内置表之上：官方页只列当前在售模型，内置表保留旧名以便历史会话仍可计价
+              table = Object.assign({}, FALLBACK_RATES, parsed)
               live = true
             }
           }
